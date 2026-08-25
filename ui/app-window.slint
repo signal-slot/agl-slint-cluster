@@ -1,0 +1,461 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2026 Signal Slot Inc.
+
+import { Theme } from "theme.slint";
+import { ArcStroke, TickRing } from "gauge-parts.slint";
+import { CenteredText, ValueUnit } from "widgets.slint";
+import { Telltale, TurnArrow } from "telltales.slint";
+
+// EV instrument cluster.
+//
+// The canvas is 1920x720 (see theme.slint) -- the panel's native size -- and every
+// coordinate below was measured off that image rather than estimated, so a
+// screenshot can be diffed against it pixel for pixel.
+//
+// The sculptural lighting is a bitmap. It is a photographic soft-light field
+// that no combination of Slint primitives reproduces (there is no blur), so it
+// is baked once and composited here; everything data-driven is drawn on top.
+export component AppWindow inherits Window {
+    title: "Instrument Cluster";
+    background: #000000;
+    // Only a preferred size. On the board the linuxkms backend makes the window
+    // the size of the panel it actually finds (1024x768 here, not the 1920x720
+    // that was assumed), and the crop/scale below fits whatever that turns out
+    // to be, because it reads root.width/root.height. Binding width/height to a
+    // constant instead forced a 1920x720 window that the panel then stretched --
+    // the stretched look. (The Qt/vncgl path returns 2/3 of the
+    // requested size with preferred-* alone, but that path is for the desktop
+    // preview, not the board.)
+    preferred-width: Theme.panel-width;
+    preferred-height: Theme.panel-height;
+
+    in property <string> time: "12:34";
+    in property <string> gear: "D";
+    in property <bool> ready: true;
+    in property <string> outside-temp: "21";
+
+    // Top telltale band. Turn arrows are the already-blinked state; each lamp
+    // level is 0 (off) or an index into that lamp's ISO-colour variants.
+    in property <bool> turn-left-on: false;
+    in property <bool> turn-right-on: false;
+    in property <int> tt-lights: 0;         // 1 low beam (green), 2 high beam (blue)
+    in property <int> tt-parking-brake: 0;  // 1 red
+    in property <int> tt-abs: 0;            // 1 amber, 2 red
+    in property <int> tt-engine: 0;         // 1 amber, 2 red
+    in property <int> tt-oil: 0;            // 1 amber, 2 red
+    in property <int> tt-battery: 0;        // 1 amber, 2 red
+    in property <int> tt-seatbelt: 0;       // 1 red
+    in property <int> tt-door: 0;           // 1 red
+    in property <int> tt-cruise: 0;         // 1 set (white), 2 active (green)
+    in property <int> tt-lane: 0;           // 1 tracking (green), 2 warn (amber), 3 depart (red)
+
+    in property <float> speed: 68;
+    in property <float> efficiency-percent: 85;
+    in property <string> range-km: "560";
+    in property <float> battery-level: 0.85;
+
+    in property <bool> lta-on: true;
+    in property <bool> lca-on: true;
+    in property <string> cruise-speed: "80";
+
+    in property <string> turn-distance: "2.4";
+    in property <string> turn-street: "Minatomirai Blvd";
+
+    in property <string> avg-efficiency: "4.8";
+    in property <string> drive-time: "01:45";
+    in property <string> odo: "12,345";
+    in property <float> fuel-level: 0.55;
+    in property <string> brand: "MOMIY";
+
+    // Slint cannot animate an input property, so each animated reading gets a
+    // display-side twin. The demo driver updates the inputs at 20 Hz and these
+    // interpolate between the updates, which is what keeps the dials smooth.
+    property <float> speed-shown: root.speed;
+    animate speed-shown { duration: 90ms; easing: linear; }
+    property <float> charge-shown: root.charge-angle;
+    animate charge-shown { duration: 160ms; easing: ease-out; }
+    property <float> efficiency-shown: root.efficiency-percent;
+    animate efficiency-shown { duration: 400ms; easing: ease-out; }
+    property <float> battery-shown: root.battery-level;
+    animate battery-shown { duration: 600ms; easing: ease-out; }
+    property <float> fuel-shown: root.fuel-level;
+    animate fuel-shown { duration: 600ms; easing: ease-out; }
+
+    // The reference's left track runs -138..+90, which is not symmetric about
+    // twelve o'clock even though CHARGE and POWER are placed symmetrically.
+    // Corrected here.
+    property <float> left-a0: -140;
+    property <float> left-a1: 140;
+    // How far the charge/power meter has swept, as an angle on that track.
+    in property <float> charge-angle: 40;
+
+    // Speedometer scale: 0..240 over an even 290 degree sweep.
+    property <float> dial-a0: -145;
+    property <float> dial-sweep: 290;
+    property <float> max-speed: 240;
+    property <float> speed-angle: root.dial-a0
+        + root.dial-sweep * Math.min(root.speed-shown, root.max-speed) / root.max-speed;
+
+    // How much of the design's width to keep, chosen from the panel's own
+    // aspect ratio so the letterbox is as small as it can be.
+    //
+    // The fit is always UNIFORM: scaling x and y independently would fill the
+    // panel exactly but turn the dials into ellipses, which is plainly wrong for
+    // an instrument. Cropping instead of squashing costs nothing, because the
+    // design has empty margins to give up -- but only down to crop-min-width,
+    // past which the graduations would be cut off.
+    //
+    //   1920x720 (2.667): keeps the full 2042 -> about 9.38px of side letterbox
+    //   1024x480 (2.133): crops to 1712      -> about 18.75px of top/bottom bars
+    property <length> fit-width: Math.max(Theme.crop-min-width,
+        Math.min(Theme.canvas-width, Theme.canvas-height * (root.width / root.height)));
+
+    canvas := Rectangle {
+        width: root.fit-width;
+        height: Theme.canvas-height;
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        clip: true;
+        transform-scale: Math.min(root.width / root.fit-width,
+                                  root.height / Theme.canvas-height);
+
+        // Design frame: holds every measured coordinate unchanged, shifted left
+        // so the crop lines up.
+        Rectangle {
+            // Centre the kept region on the design.
+            x: -(Theme.canvas-width - root.fit-width) / 2;
+            y: 0;
+            width: Theme.canvas-width;
+            height: Theme.canvas-height;
+
+        Image {
+            x: 0; y: 0; width: 100%; height: 100%;
+            source: @image-url("assets/backdrop-plate.png");
+            image-fit: fill;
+        }
+
+        // Vector glow rings on the (ring-free) backdrop -- no mask needed.
+        Image {
+            x: Theme.left-cx - 300px; y: Theme.left-cy - 300px; width: 600px; height: 600px;
+            source: @image-url("assets/ring-left.svg");
+        }
+        Image {
+            x: Theme.right-cx - 300px; y: Theme.right-cy - 300px; width: 600px; height: 600px;
+            source: @image-url("assets/ring-right.svg");
+        }
+
+        // The backdrop's baked rings are NOT circular, so we hide them with a
+        // dark disc and draw our own perfect-circle glow rings (SVG) instead.
+
+
+        // ---------------- telltale band ----------------
+        // A thin centred row above the status bar. Lamps are only shown when
+        // lit (ISO colours + a soft halo); off lamps fade out but keep their
+        // slot, so nothing shifts. Turn arrows sit at the ends.
+        HorizontalLayout {
+            x: 0; width: 100%; y: 26px; height: 48px;
+            alignment: center;
+            spacing: 7px;
+            TurnArrow { on: root.turn-left-on; }
+            Telltale { variants: [@image-url("assets/telltales/AGL_Icons_Lights_green.svg"), @image-url("assets/telltales/AGL_Icons_Lights_blue.svg")]; level: root.tt-lights; glows: [#4cd07d, #55a8ff]; }
+            Telltale { variants: [@image-url("assets/telltales/AGL_Icons_ParkingBrake_red.svg")]; level: root.tt-parking-brake; glows: [#ff4438]; }
+            Telltale { variants: [@image-url("assets/telltales/AGL_Icons_ABS_amber.svg"), @image-url("assets/telltales/AGL_Icons_ABS_red.svg")]; level: root.tt-abs; glows: [#ffb02e, #ff4438]; }
+            Telltale { variants: [@image-url("assets/telltales/AGL_Icons_Engine_amber.svg"), @image-url("assets/telltales/AGL_Icons_Engine_red.svg")]; level: root.tt-engine; glows: [#ffb02e, #ff4438]; }
+            Telltale { variants: [@image-url("assets/telltales/AGL_Icons_Oil_amber.svg"), @image-url("assets/telltales/AGL_Icons_Oil_red.svg")]; level: root.tt-oil; glows: [#ffb02e, #ff4438]; }
+            Telltale { variants: [@image-url("assets/telltales/AGL_Icons_Battery_amber.svg"), @image-url("assets/telltales/AGL_Icons_Battery_red.svg")]; level: root.tt-battery; glows: [#ffb02e, #ff4438]; }
+            Telltale { variants: [@image-url("assets/telltales/AGL_Icons_Seatbelt_red.svg")]; level: root.tt-seatbelt; glows: [#ff4438]; }
+            Telltale { variants: [@image-url("assets/telltales/AGL_Icons_OpenDoor_red.svg")]; level: root.tt-door; glows: [#ff4438]; }
+            Telltale { variants: [@image-url("assets/telltales/AGL_Icons_CruiseControl_white.svg"), @image-url("assets/telltales/AGL_Icons_CruiseControl_green.svg")]; level: root.tt-cruise; glows: [#e8f1fb, #4cd07d]; }
+            Telltale { variants: [@image-url("assets/telltales/AGL_Icons_LaneDeparture_green.svg"), @image-url("assets/telltales/AGL_Icons_LaneDeparture_amber.svg"), @image-url("assets/telltales/AGL_Icons_LaneDeparture_red.svg")]; level: root.tt-lane; glows: [#4cd07d, #ffb02e, #ff4438]; }
+            TurnArrow { mirror: true; on: root.turn-right-on; }
+        }
+
+        // ---------------- status bar ----------------
+        CenteredText { text: root.time; size: 24.38px; cx: 765.94px; cy: 82.81px; }
+        CenteredText {
+            text: root.gear; size: 33.75px; weight: 300;
+            ink: Theme.gear-blue; cx: 956.25px; cy: 82.81px;
+        }
+        Rectangle {
+            x: 988.12px; y: 70.62px; width: 90px; height: 25.31px;
+            border-width: 0.94px;
+            border-color: root.ready ? Theme.ready-green : Theme.text-dim;
+            Text {
+                text: @tr("READY");
+                color: root.ready ? Theme.ready-green : Theme.text-dim;
+                font-size: 17.81px;
+            }
+        }
+        CenteredText { text: root.outside-temp + "°C"; size: 23.44px; cx: 1167.19px; cy: 82.81px; }
+        Rectangle {
+            x: 656.25px; y: 134.06px; width: 600px; height: 0.94px;
+            background: @linear-gradient(90deg,
+                #ffffff00 0%, #ffffff4d 22%, #ffffff59 50%, #ffffff4d 78%, #ffffff00 100%);
+        }
+
+        // ---------------- speed ----------------
+        CenteredText {
+            text: Math.round(root.speed-shown); size: 82.5px; weight: 200;
+            cx: 956.25px; cy: 195.94px;
+        }
+        CenteredText {
+            text: "km/h"; size: 16.88px; ink: Theme.text-secondary;
+            cx: 957.19px; cy: 252.19px;
+        }
+
+        // ---------------- left dial ----------------
+        // The band brightens both across its width (inner -> outer) and along
+        // the sweep towards the active edge. The radial climb is the 5
+        // concentric rings (outer brightest); the along-the-arc climb is a
+        // conic gradient per ring, centred on the dial -- so one arc carries
+        // the whole fade. Note mix(other, factor) weights SELF by factor.
+        for k in 5: ArcStroke {
+            x: Theme.left-cx - 281.25px; y: Theme.left-cy - 281.25px;
+            width: 562.5px; height: 562.5px;
+            radius: 200.13px + 1.99px * k;
+            start-angle: root.left-a0; end-angle: root.left-a1;
+            thickness: 4.5px;
+            stroke-brush: #141a22;
+        }
+        // Centre-zero power meter: the fill grows from 12 o'clock (0) to the
+        // right for POWER (using energy) and to the left for CHARGE/REGEN
+        // (recovering energy). charge-shown is signed: >=0 power, <0 regen.
+        // Each ring is a single arc coloured by a conic gradient centred on the
+        // dial, so the along-the-arc fade (dim at the 0-marker, bright at the
+        // active leading edge) is the gradient itself -- no per-segment
+        // tessellation. The 5 rings only carry the radial softness.
+        for k in 5: ArcStroke {
+            property <float> t: k / 4;
+            // Radial ramp measured off the reference (outer ring brightest).
+            property <float> radial: 0.62 + 0.38 * Math.pow(self.t, 1.7);
+            property <bool> pwr: root.charge-shown >= 0;
+            // Endpoint colours: `tail` sits at the 0-marker, `edge` at the
+            // active extreme. POWER is blue-white, CHARGE/REGEN is green.
+            // mix(base, s) weights the colour by s, so higher radial = brighter.
+            property <color> tail: (self.pwr ? #9dbbe6 : #eafff2).mix(#0b1018, self.pwr ? 0.72 * self.radial : self.radial);
+            property <color> edge: (self.pwr ? #ffffff : #5fdca0).mix(#0b1018, self.pwr ? self.radial : 0.72 * self.radial);
+            // Rotate the gradient so its 0deg lands on the arc's tail, and place
+            // the bright stop a signed sweep away at the leading edge.
+            property <color> s0: self.pwr ? self.tail : self.edge;
+            property <color> s1: self.pwr ? self.edge : self.tail;
+            property <angle> from-a: self.pwr ? 0deg : root.charge-shown * 1deg;
+            property <angle> span-a: (self.pwr ? root.charge-shown : -root.charge-shown) * 1deg;
+            x: Theme.left-cx - 281.25px; y: Theme.left-cy - 281.25px;
+            width: 562.5px; height: 562.5px;
+            radius: 200.13px + 1.99px * k;
+            start-angle: Math.min(0, root.charge-shown);
+            end-angle: Math.max(0, root.charge-shown);
+            thickness: 4.5px;
+            stroke-brush: @conic-gradient(
+                from self.from-a,
+                s0 0deg,
+                s1 self.span-a,
+            );
+        }
+
+        // Graduations, outside the band.
+        TickRing {
+            x: Theme.left-cx - 281.25px; y: Theme.left-cy - 281.25px;
+            width: 562.5px; height: 562.5px;
+            // Measured: the graduations occupy r=222..236, just outside the
+            // band, and are faint.
+            radius: 208px; start-angle: root.left-a0; sweep: root.left-a1 - root.left-a0;
+            count: 57; major-every: 7;
+            minor-length: 13.12px; major-length: 22.5px;
+            minor-color: #2e3742; major-color: #5c6874;
+        }
+        // Zero marker at 12 o'clock -- the centre of the power/charge scale.
+        Rectangle {
+            x: Theme.left-cx - 1.41px; y: Theme.left-cy - 225px;
+            width: 2.81px; height: 18.75px; background: #cfd8e2;
+        }
+        CenteredText { text: @tr("CHARGE"); size: 15px; letter-spacing: 0.38px; ink: Theme.text-secondary; cx: Theme.left-cx - 145.31px; cy: Theme.left-cy - 194.06px; }
+        CenteredText { text: @tr("POWER"); size: 15px; letter-spacing: 0.38px; ink: Theme.text-secondary; cx: Theme.left-cx + 148.12px; cy: Theme.left-cy - 194.06px; }
+        CenteredText { text: @tr("REGEN"); size: 14.06px; letter-spacing: 0.19px; ink: Theme.text-secondary; cx: Theme.left-cx - 162.19px; cy: Theme.left-cy + 183.75px; }
+
+        CenteredText { text: @tr("ECO ZONE"); size: 15px; letter-spacing: 0.56px; ink: Theme.text-secondary; cx: Theme.left-cx; cy: Theme.left-cy - 90.94px; }
+        Rectangle { x: Theme.left-cx - 0.7px; y: Theme.left-cy - 63.75px; width: 1.41px; height: 10.31px; background: Theme.text-dim; }
+        ValueUnit {
+            value: Math.round(root.efficiency-shown); unit: "%";
+            value-size: 64.69px; value-weight: 200; unit-size: 23.44px;
+            unit-color: Theme.text-primary; gap: 2.81px; unit-lift: 8.44px;
+            cx: Theme.left-cx; cy: Theme.left-cy - 15.94px;
+        }
+        CenteredText { text: @tr("EV EFFICIENCY"); size: 16.88px; letter-spacing: 0.19px; ink: Theme.text-secondary; cx: Theme.left-cx; cy: Theme.left-cy + 37.5px; }
+
+        ValueUnit {
+            value: root.range-km; unit: "km";
+            value-size: 26.25px; unit-size: 17.81px; gap: 5.62px;
+            cx: Theme.left-cx; cy: Theme.left-cy + 141.56px;
+        }
+
+        // ---------------- right dial ----------------
+        // Speed arc. Driven by the speed reading: in the reference the glow
+        // runs out to about 120 km/h while the digits read 68, which is simply
+        // wrong for a speedometer, so the code takes the honest reading.
+        ArcStroke {
+            x: Theme.right-cx - 300px; y: Theme.right-cy - 300px;
+            width: 600px; height: 600px;
+            radius: 204px;
+            start-angle: root.dial-a0;
+            end-angle: root.speed-angle;
+            thickness: 12.66px;
+            // One arc, coloured by a conic gradient centred on the dial, so the
+            // fade runs ALONG the arc (dim tail -> bright leading edge). `from`
+            // puts the gradient's 0deg at the tail; the bright stop tracks the
+            // leading edge. No per-segment tessellation.
+            property <angle> tail: root.dial-a0 * 1deg;
+            property <angle> span: (root.speed-angle - root.dial-a0) * 1deg;
+            stroke-brush: @conic-gradient(
+                from self.tail,
+                #0b1018 0deg,
+                #3f74cc self.span * 0.6,
+                #ffffff self.span,
+            );
+        }
+        // Bloom, now that the plate no longer carries the reference's glow.
+        for b in 7: ArcStroke {
+            property <float> k: b / 6;
+            x: Theme.right-cx - 300px; y: Theme.right-cy - 300px;
+            width: 600px; height: 600px;
+            radius: 204px;
+            start-angle: root.speed-angle - (root.speed-angle - root.dial-a0) * (0.55 - 0.07 * b);
+            end-angle: root.speed-angle;
+            thickness: 19.69px - 1.88px * b;
+            stroke-brush: #9cc6ff.with-alpha(0.022 + 0.015 * self.k);
+        }
+
+        // Graduations: 5 km/h apart, every fourth one long, so they line up
+        // with the numbers. The reference's ring is neither evenly spaced nor
+        // circular; that is an artefact of how the image was made.
+        TickRing {
+            x: Theme.right-cx - 300px; y: Theme.right-cy - 300px;
+            width: 600px; height: 600px;
+            radius: 208px;
+            start-angle: root.dial-a0; sweep: root.dial-sweep;
+            count: 49; major-every: 4;
+            minor-length: 13.12px; major-length: 22.5px;
+            minor-color: #47515d; major-color: #cbd5e1;
+        }
+
+        // Scale numbers on a true circle, evenly spaced.
+        for n in 13: CenteredText {
+            property <float> a: root.dial-a0 + root.dial-sweep * n / 12;
+            text: n * 20;
+            size: 20.62px;
+            ink: Theme.text-secondary;
+            cx: Theme.right-cx + 142.5px * Math.sin(self.a * 1deg);
+            cy: Theme.right-cy - 142.5px * Math.cos(self.a * 1deg);
+        }
+
+        CenteredText { text: @tr("DRIVE INFO"); size: 15px; letter-spacing: 0.19px; ink: Theme.text-secondary; cx: Theme.right-cx; cy: Theme.right-cy - 76.88px; }
+        CenteredText { text: @tr("AVG. EFFICIENCY"); size: 16.88px; ink: Theme.text-secondary; cx: Theme.right-cx; cy: Theme.right-cy - 46.88px; }
+        ValueUnit {
+            value: root.avg-efficiency; unit: "km/kWh";
+            value-size: 30.94px; value-weight: 300; unit-size: 15px;
+            gap: 4.69px; unit-lift: 3.75px;
+            cx: Theme.right-cx; cy: Theme.right-cy - 15.94px;
+        }
+        CenteredText { text: @tr("DRIVE TIME"); size: 16.88px; ink: Theme.text-secondary; cx: Theme.right-cx; cy: Theme.right-cy + 30.94px; }
+        CenteredText { text: root.drive-time; size: 27.19px; weight: 300; cx: Theme.right-cx; cy: Theme.right-cy + 62.81px; }
+
+        CenteredText { text: @tr("ODO"); size: 15.94px; letter-spacing: 0.38px; ink: Theme.text-secondary; cx: Theme.right-cx - 51.56px; cy: Theme.right-cy + 144.38px; }
+        ValueUnit {
+            value: root.odo; unit: "km";
+            value-size: 19.69px; unit-size: 13.12px; gap: 3.75px;
+            cx: Theme.right-cx + 51.56px; cy: Theme.right-cy + 143.44px;
+        }
+        CenteredText { text: "km/h"; size: 15.94px; ink: Theme.text-secondary; cx: Theme.right-cx + 177.19px; cy: Theme.right-cy + 184.69px; }
+
+        // Battery charge fill inside the backdrop's battery frame (bottom-left).
+        Rectangle {
+            x: 129px; y: 571px; width: 295px; height: 22px; border-radius: 4px;
+            Rectangle {
+                x: 0; y: 0; width: max(6px, parent.width * root.battery-shown); height: parent.height;
+                border-radius: 4px;
+                background: @linear-gradient(90deg, #2f6ec8 0%, #6fb0ff 100%);
+            }
+        }
+        // Fuel level fill inside the backdrop's fuel frame (bottom-right), 5 segments.
+        Rectangle {
+            x: 1543px; y: 576px; width: 260px; height: 21px;
+            for s in 5: Rectangle {
+                property <float> seg-start: s / 5;
+                x: parent.width / 5 * s + 2px; y: 0; width: parent.width / 5 - 4px; height: parent.height;
+                border-radius: 2px;
+                background: root.fuel-shown > self.seg-start ? Theme.accent : #2a2f38;
+            }
+        }
+
+        // ---------------- centre panels ----------------
+        Path {
+            x: 675px; y: 277.5px; width: 69.38px; height: 25.31px;
+            viewbox-x: 0; viewbox-y: 0; viewbox-width: 74; viewbox-height: 27;
+            stroke: Theme.accent; stroke-width: 2.06px;
+            MoveTo { x: 10; y: 25; }
+            LineTo { x: 22; y: 2; }
+            MoveTo { x: 64; y: 25; }
+            LineTo { x: 52; y: 2; }
+        }
+        Path {
+            x: 695.62px; y: 283.12px; width: 28.12px; height: 18.75px;
+            viewbox-x: 0; viewbox-y: 0; viewbox-width: 30; viewbox-height: 20;
+            fill: Theme.accent;
+            MoveTo { x: 4; y: 13; }
+            LineTo { x: 8; y: 5; }
+            LineTo { x: 22; y: 5; }
+            LineTo { x: 26; y: 13; }
+            LineTo { x: 26; y: 18; }
+            LineTo { x: 4; y: 18; }
+            Close { }
+        }
+        Rectangle { x: 660.94px; y: 308.44px; width: 150px; height: 0.94px; background: #ffffff26; }
+        CenteredText { text: @tr("LTA"); size: 17.81px; cx: 691.88px; cy: 329.06px; }
+        CenteredText { text: root.lta-on ? "ON" : "OFF"; size: 17.81px; ink: root.lta-on ? Theme.text-primary : Theme.text-dim; cx: 779.06px; cy: 329.06px; }
+        Rectangle { x: 660.94px; y: 339.38px; width: 150px; height: 0.94px; background: #ffffff26; }
+        CenteredText { text: @tr("LCA"); size: 17.81px; cx: 694.69px; cy: 359.06px; }
+        CenteredText { text: root.lca-on ? "ON" : "OFF"; size: 17.81px; ink: root.lca-on ? Theme.text-primary : Theme.text-dim; cx: 779.06px; cy: 359.06px; }
+        Rectangle { x: 660.94px; y: 370.31px; width: 150px; height: 0.94px; background: #ffffff26; }
+        Rectangle {
+            x: 669.38px; y: 380.62px; width: 22.5px; height: 22.5px;
+            border-width: 1.88px; border-color: Theme.text-primary; border-radius: 11.25px;
+        }
+        Rectangle { x: 675px; y: 390px; width: 11.25px; height: 2.81px; background: Theme.text-primary; border-radius: 1.41px; }
+        ValueUnit {
+            value: root.cruise-speed; unit: "km/h";
+            value-size: 19.69px; unit-size: 14.06px; gap: 2.81px;
+            cx: 750px; cy: 391.88px;
+        }
+
+        Path {
+            x: 1172.81px; y: 282.19px; width: 63.75px; height: 61.88px;
+            viewbox-x: 0; viewbox-y: 0; viewbox-width: 68; viewbox-height: 66;
+            stroke: Theme.text-primary; stroke-width: 5.62px;
+            MoveTo { x: 12; y: 62; }
+            CubicTo { control-1-x: 14; control-1-y: 32; control-2-x: 34; control-2-y: 24; x: 46; y: 20; }
+        }
+        Path {
+            x: 1172.81px; y: 282.19px; width: 63.75px; height: 61.88px;
+            viewbox-x: 0; viewbox-y: 0; viewbox-width: 68; viewbox-height: 66;
+            fill: Theme.text-primary;
+            MoveTo { x: 60; y: 14; }
+            LineTo { x: 43; y: 36; }
+            LineTo { x: 37; y: 8; }
+            Close { }
+        }
+        ValueUnit {
+            value: root.turn-distance; unit: "km";
+            value-size: 28.12px; value-weight: 300; unit-size: 14.06px; unit-lift: 2.81px; gap: 3.75px;
+            cx: 1192.5px; cy: 366.56px;
+        }
+        CenteredText { text: root.turn-street; size: 18.75px; ink: Theme.text-secondary; cx: 1187.81px; cy: 399.38px; }
+
+        CenteredText {
+            text: root.brand; size: 18.75px; letter-spacing: 14.06px;
+            ink: #8a939e; cx: 963.75px; cy: 585px;
+        }
+
+
+        }
+    }
+}

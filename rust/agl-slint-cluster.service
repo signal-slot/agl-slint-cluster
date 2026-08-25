@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 Signal Slot Inc.
+[Unit]
+Description=Slint instrument cluster
+
+[Service]
+# Render straight to KMS/DRM with no compositor. On AGL, seamless boot-splash
+# handover (drm-lease-manager) is added when packaging the image; this generic
+# unit just takes the display directly.
+Environment=SLINT_BACKEND=linuxkms
+Environment=SLINT_FULLSCREEN=1
+ExecStart=/usr/bin/agl-slint-cluster
+Restart=on-failure
+RestartSec=2
+# It ships without systemd sandboxing (ProtectSystem, NoNewPrivileges, ...);
+# add those for a production image.
+
+[Install]
+WantedBy=multi-user.target

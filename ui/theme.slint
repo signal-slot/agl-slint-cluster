@@ -1,0 +1,44 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2026 Signal Slot Inc.
+
+// Shared palette and metrics.
+//
+// The canvas is the reference image's own pixel size, so every coordinate in
+// this UI is a pixel coordinate measured off that image and a screenshot can be
+// diffed against it 1:1. AppWindow scales the canvas to whatever the panel
+// gives us.
+export global Theme {
+    // The design canvas is the reference image's own size, so every coordinate
+    // in the UI stays a measured pixel coordinate.
+    out property <length> canvas-width: 1920px;
+    out property <length> canvas-height: 720px;
+
+    // Useful content spans x=171..1883 -- the outer graduations of the two
+    // dials. Everything outside that is empty margin, so it can be cropped away
+    // when the panel is narrower than the design.
+    out property <length> crop-min-width: 1605px;
+
+    // The target panel. HDMI, 1920x720, touch.
+    out property <length> panel-width: 1920px;
+    out property <length> panel-height: 720px;
+
+    out property <color> text-primary: #f2f5f8;
+    out property <color> text-secondary: #a8b2bd;
+    out property <color> text-dim: #6b7078;
+
+    out property <color> accent: #6ea8ff;
+    out property <color> accent-bright: #cfe2ff;
+    out property <color> ready-green: #4ade80;
+    out property <color> gear-blue: #7cb0ff;
+
+    // Dial centres, fitted to the arcs in the reference.
+    // Dial centres. The backdrop's two rings are mirror-symmetric about the
+    // canvas centre, so the right centre is defined as the mirror of the left
+    // and both share one y -- symmetry cannot drift.
+    out property <length> left-cx: 322px;
+    // Perfect-circle SVG rings, positioned/sized to the #27 backdrop's rings
+    // (which are not truly circular). x is symmetric; y differs per side.
+    out property <length> left-cy: 325px;
+    out property <length> right-cx: root.canvas-width - root.left-cx;
+    out property <length> right-cy: 325px;
+}

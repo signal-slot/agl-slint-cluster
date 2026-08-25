@@ -1,0 +1,67 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2026 Signal Slot Inc.
+
+import { Theme } from "theme.slint";
+
+// A text placed by the centre of its ink, which is what the reference was
+// measured as. Slint positions a Text by its box, and the box carries font
+// leading, so centring on the box would sit the glyphs low.
+export component CenteredText inherits Rectangle {
+    in property <string> text;
+    in property <length> size: 18.75px;
+    in property <int> weight: 400;
+    in property <color> ink: Theme.text-primary;
+    in property <length> letter-spacing: 0px;
+    // Measured ink centre.
+    in property <length> cx;
+    in property <length> cy;
+
+    x: root.cx - self.width / 2;
+    y: root.cy - self.height / 2;
+    width: t.width;
+    height: t.height;
+
+    t := Text {
+        text: root.text;
+        font-size: root.size;
+        font-weight: root.weight;
+        color: root.ink;
+        letter-spacing: root.letter-spacing;
+    }
+}
+
+// A value and its unit, positioned by the ink centre of the pair.
+export component ValueUnit inherits Rectangle {
+    in property <string> value;
+    in property <string> unit;
+    in property <length> value-size: 22.5px;
+    in property <length> unit-size: 15.94px;
+    in property <int> value-weight: 400;
+    in property <color> value-color: Theme.text-primary;
+    in property <color> unit-color: Theme.text-secondary;
+    in property <length> gap: 4.69px;
+    in property <length> unit-lift: 1.88px;
+    in property <length> cx;
+    in property <length> cy;
+
+    x: root.cx - self.width / 2;
+    y: root.cy - self.height / 2;
+    width: v.width + root.gap + u.width;
+    height: v.height;
+
+    v := Text {
+        text: root.value;
+        font-size: root.value-size;
+        font-weight: root.value-weight;
+        color: root.value-color;
+        x: 0;
+        y: 0;
+    }
+    u := Text {
+        text: root.unit;
+        font-size: root.unit-size;
+        color: root.unit-color;
+        x: v.width + root.gap;
+        y: v.height - self.height - root.unit-lift;
+    }
+}

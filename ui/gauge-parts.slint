@@ -1,0 +1,98 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2026 Signal Slot Inc.
+
+import { Theme } from "theme.slint";
+
+// Angles everywhere in this file are degrees measured CLOCKWISE FROM 12
+// O'CLOCK, because that is how a dial is read. Slint's coordinate system has y
+// growing downwards, so a point at angle a sits at
+//   (cx + r*sin(a), cy - r*cos(a)).
+
+// A stroked circular arc. Drawn as a Path in viewbox units centred on (0,0),
+// so the arithmetic below is plain circle geometry.
+export component ArcStroke inherits Path {
+    in property <length> radius;
+    in property <float> start-angle;
+    in property <float> end-angle;
+    in property <length> thickness: 3.75px;
+    in property <brush> stroke-brush: #ffffff;
+
+    // Path coordinates are unitless, so carry the radius as a bare number.
+    property <float> r: root.radius / 0.94px;
+
+    // The viewbox is the element's own pixel size, centred on the element. That
+    // keeps one viewbox unit equal to one pixel, so `radius` is a real radius.
+    // Sizing the viewbox from the radius instead (as this did originally) makes
+    // the arc scale with whatever element size the caller happens to use.
+    viewbox-x: -(root.width / 0.94px) / 2;
+    viewbox-y: -(root.height / 0.94px) / 2;
+    viewbox-width: root.width / 0.94px;
+    viewbox-height: root.height / 0.94px;
+
+    stroke: root.stroke-brush;
+    stroke-width: root.thickness;
+
+    MoveTo {
+        x: root.r * Math.sin(root.start-angle * 1deg);
+        y: -root.r * Math.cos(root.start-angle * 1deg);
+    }
+    ArcTo {
+        x: root.r * Math.sin(root.end-angle * 1deg);
+        y: -root.r * Math.cos(root.end-angle * 1deg);
+        radius-x: root.r;
+        radius-y: root.r;
+        // An SVG arc needs the large-arc flag once the sweep passes a
+        // half turn, otherwise it draws the short way round.
+        large-arc: (root.end-angle - root.start-angle) > 180;
+        sweep: true;
+    }
+}
+
+// A ring of radial tick marks. Every `major-every`-th tick is longer and
+// brighter, which is what carries the scale reading on the speedometer.
+//
+// Each tick is a Path line drawn straight from the inner to the outer radius.
+// Rotating a Rectangle with the common `transform-rotation` property would work
+// too, but the radial segment is the exact geometry, so there is nothing to
+// rotate and no origin to get wrong.
+export component TickRing inherits Rectangle {
+    in property <int> count: 49;
+    in property <int> major-every: 4;
+    in property <length> radius;
+    in property <float> start-angle;
+    in property <float> sweep;
+    in property <length> minor-length: 8.44px;
+    in property <length> major-length: 15.94px;
+    in property <color> minor-color: #4a5560;
+    in property <color> major-color: #c8d2dc;
+
+    // The ring is static geometry; cache it rather than re-tessellating the
+    // ticks every frame.
+    cache-rendering-hint: true;
+
+    property <float> r: root.radius / 0.94px;
+
+    for i in root.count: Path {
+        property <float> a: root.start-angle + root.sweep * i / (root.count - 1);
+        property <bool> is-major: Math.mod(i, root.major-every) == 0;
+        property <float> len: (self.is-major ? root.major-length : root.minor-length) / 0.94px;
+
+        width: 100%;
+        height: 100%;
+        viewbox-x: -(root.width / 0.94px) / 2;
+        viewbox-y: -(root.height / 0.94px) / 2;
+        viewbox-width: root.width / 0.94px;
+        viewbox-height: root.height / 0.94px;
+        stroke: self.is-major ? root.major-color : root.minor-color;
+        stroke-width: self.is-major ? 2.34px : 1.41px;
+
+        MoveTo {
+            x: (root.r - parent.len) * Math.sin(parent.a * 1deg);
+            y: -(root.r - parent.len) * Math.cos(parent.a * 1deg);
+        }
+        LineTo {
+            x: root.r * Math.sin(parent.a * 1deg);
+            y: -root.r * Math.cos(parent.a * 1deg);
+        }
+    }
+}

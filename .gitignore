@@ -1,0 +1,8 @@
+# Rust / Cargo (build output, in any target dir)
+target/
+.target/
+**/*.rs.bk
+
+# Editor / OS
+.DS_Store
+*.swp

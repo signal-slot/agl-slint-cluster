@@ -1,0 +1,70 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2026 Signal Slot Inc.
+
+// Warning / status lamps and turn arrows for the top telltale band.
+//
+// Telltales are data-driven and *only shown when lit*: an off lamp fades to
+// nothing rather than sitting as a grey box, so the band stays clean and in
+// keeping with the cluster's own glow. Each lamp keeps a fixed slot, the way a
+// real cluster does, so lit lamps never shift the others.
+
+import { Theme } from "theme.slint";
+
+// One lamp. `variants` are the ISO-colour glyphs in the order `level` indexes
+// them (1 -> variants[0], ...); `level` 0 is off. `glow` tints the soft halo.
+export component Telltale inherits Rectangle {
+    in property <[image]> variants;
+    in property <int> level: 0;
+    in property <length> icon-size: 27px;
+    // One halo colour per variant, so the glow follows the lit severity
+    // (e.g. amber halo at level 1, red halo at level 2) instead of a fixed hue.
+    in property <[color]> glows;
+
+    property <int> idx: max(0, min(root.level, root.variants.length) - 1);
+
+    width: root.icon-size * 1.75;
+    height: root.icon-size * 1.75;
+    // Instant on/off (no fade -- a warning lamp must not look delayed), while
+    // keeping the layout slot so lit lamps never shift the others.
+    opacity: root.level > 0 ? 1 : 0;
+
+    // Soft halo, so a lit lamp reads as glowing rather than pasted on.
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        background: @radial-gradient(circle, root.glows[root.idx].with-alpha(0.30) 0%, transparent 60%);
+    }
+    Image {
+        width: root.icon-size;
+        height: root.icon-size;
+        image-fit: contain;
+        source: root.variants[root.idx];
+    }
+}
+
+// A blinking turn arrow. `on` is the already-resolved blink state (the Rust
+// side toggles it), so the arrow is simply green when on and gone when off.
+export component TurnArrow inherits Path {
+    in property <bool> mirror: false;
+    in property <bool> on: false;
+
+    height: 27px;
+    width: self.height * 1.15;
+
+    viewbox-width: 100;
+    viewbox-height: 100;
+    fill: root.on ? #46e07a : transparent;
+
+    function d(v: float) -> float {
+        return root.mirror ? 100 - v : v;
+    }
+
+    MoveTo { x: d(0);   y: 50; }
+    LineTo { x: d(60);  y: 0; }
+    LineTo { x: d(60);  y: 28; }
+    LineTo { x: d(100); y: 28; }
+    LineTo { x: d(100); y: 72; }
+    LineTo { x: d(60);  y: 72; }
+    LineTo { x: d(60);  y: 100; }
+    LineTo { x: d(0);   y: 50; }
+}

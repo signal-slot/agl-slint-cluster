@@ -1,0 +1,37 @@
+[package]
+name = "agl-slint-cluster"
+version = "0.1.0"
+edition = "2024"
+description = "A Slint instrument cluster for Automotive Grade Linux, rendering straight to KMS/DRM"
+license = "MIT"
+repository = "https://github.com/signal-slot/agl-slint-cluster"
+authors = ["Tasuku Suzuki <tasuku.suzuki@signal-slot.co.jp>"]
+readme = "README.md"
+rust-version = "1.85"   # edition 2024
+
+[dependencies]
+# default-features = false drops the winit backend, which would otherwise be
+# compiled in and selected at runtime. The backend and renderer are chosen by
+# the feature flags below instead.
+slint = { version = "1.17.1", default-features = false, features = ["compat-1-2", "std"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+
+[build-dependencies]
+slint-build = "1.17.1"
+
+[features]
+# Desktop development on the host: a normal window.
+default = ["desktop"]
+desktop = ["slint/backend-winit", "slint/renderer-femtovg"]
+# A board with no compositor: render straight to KMS/DRM with Skia. Build with
+# `--no-default-features --features device`. (Handing the display over from a
+# boot splash via drm-lease-manager is an AGL packaging concern, wired up there,
+# not in the application.)
+device = ["slint/backend-linuxkms", "slint/renderer-skia"]
+# Headless verification on a workstation: the Qt backend, e.g. served over VNC
+# with a VNC QPA platform. Build with `--no-default-features --features qt`.
+qt = ["slint/backend-qt"]
+
+[profile.release]
+codegen-units = 1
+lto = true
