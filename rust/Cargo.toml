@@ -18,9 +18,20 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 # Linux SocketCAN, for the `can` telemetry source. Every target here is Linux
 # (KMS/DRM on the board, a window on the workstation), so it is unconditional.
 socketcan = { version = "4.0", default-features = false }
+# Eclipse Kuksa databroker client (kuksa.val.v2 over gRPC), for the `kuksa`
+# telemetry source. Client side only: no server, no TLS.
+tonic = { version = "0.14", default-features = false, features = ["channel", "codegen"] }
+tonic-prost = "0.14"
+prost = "0.14"
+prost-types = "0.14"
+tokio = { version = "1", features = ["rt", "time", "sync"] }
 
 [build-dependencies]
 slint-build = "1.17.1"
+# The Kuksa protos are compiled by protox, a pure-Rust protobuf compiler, so
+# no protoc is needed on the build host (or in a Yocto cross build).
+tonic-prost-build = "0.14"
+protox = "0.9"
 
 [features]
 # Desktop development on the host: a normal window.

@@ -7,5 +7,6 @@
 //! encoder to play the part of the vehicle on a (virtual) bus.
 
 pub mod can;
+pub mod kuksa;
 pub mod sim;
 pub mod telemetry;

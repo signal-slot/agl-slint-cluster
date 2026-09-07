@@ -17,6 +17,7 @@ target keeps its own thin application layer:
 ```
 ui/          shared, language-agnostic UI (.slint + assets) -- the design lives here
 can/         the CAN frame layout as a DBC, shared by every target (see docs/can.md)
+docs/        the CAN and Kuksa/VSS interfaces of the cluster
 rust/        Linux / AGL application (this is what builds today)
 zephyr/      C++ on Zephyr RTOS            (planned)
 baremetal/   no_std Rust on an MCU, e.g. Pico 2 / RP2350 (planned)
@@ -107,6 +108,21 @@ sudo ip link add dev vcan0 type vcan && sudo ip link set up vcan0
 CLUSTER_SOURCE=can:vcan0 cargo run &     # in rust/
 cargo run --bin cansim                   # sends the drive cycle on vcan0
 cansend vcan0 104#15                     # ..and poke at it: indicator, low beam, parking brake
+```
+
+### From a Kuksa databroker (VSS)
+
+Set `CLUSTER_SOURCE=kuksa` (or `kuksa:<url>`) and the cluster subscribes to
+the [Eclipse Kuksa](https://eclipse-kuksa.github.io/kuksa-website/) databroker
+that AGL ships, reading its signals by their VSS names (`Vehicle.Speed`,
+`Vehicle.Body.Lights.Beam.Low.IsOn`, ...). The mapping is in
+[`docs/kuksa.md`](docs/kuksa.md). With a broker in a container, `kuksasim`
+plays the vehicle:
+
+```sh
+docker run --rm -p 55555:55555 ghcr.io/eclipse-kuksa/kuksa-databroker:0.6.0 --insecure
+CLUSTER_SOURCE=kuksa cargo run &         # in rust/
+cargo run --bin kuksasim                 # publishes the drive cycle as VSS signals
 ```
 
 ### Deployment

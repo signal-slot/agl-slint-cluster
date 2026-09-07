@@ -26,4 +26,10 @@ Some bundled assets originate elsewhere:
 - **Ring glow** (`ui/assets/ring-left.svg`, `ring-right.svg`) is generated
   (perfect-circle arcs with a Gaussian-blur glow) and is original to this repo.
 
+- **Kuksa protocol definitions** (`rust/proto/kuksa/val/v2/*.proto`) are
+  vendored unchanged from the [Eclipse Kuksa](https://github.com/eclipse-kuksa/kuksa-databroker)
+  project (Copyright the Eclipse Foundation contributors) under the
+  **Apache License 2.0**; the `kuksa` telemetry source compiles them at build
+  time. The MIT license of this repository does not cover them.
+
 - [Slint](https://slint.dev/) provides the UI toolkit. See its own licensing.
