@@ -125,6 +125,13 @@ CLUSTER_SOURCE=kuksa cargo run &         # in rust/
 cargo run --bin kuksasim                 # publishes the drive cycle as VSS signals
 ```
 
+### From a real car (OBD-II)
+
+Set `CLUSTER_SOURCE=obd:bt:<address>` (or `obd:tcp:<host:port>`,
+`obd:serial:<path>`) and the cluster polls an ELM327-compatible OBD-II dongle
+for speed, fuel level, ambient temperature, the MIL and the odometer. Read
+only. See [`docs/obd.md`](docs/obd.md).
+
 ### Deployment
 
 `agl-slint-cluster.service` is a systemd unit that starts the cluster on the board. It sets

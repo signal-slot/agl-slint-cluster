@@ -8,5 +8,6 @@
 
 pub mod can;
 pub mod kuksa;
+pub mod obd;
 pub mod sim;
 pub mod telemetry;

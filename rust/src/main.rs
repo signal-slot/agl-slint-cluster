@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use agl_slint_cluster::can::CanSource;
 use agl_slint_cluster::kuksa::KuksaSource;
+use agl_slint_cluster::obd::ObdSource;
 use agl_slint_cluster::sim::SimSource;
 use agl_slint_cluster::telemetry::{Beam, Cruise, Lane, Telemetry, TelemetrySource, Warn};
 
@@ -110,6 +111,8 @@ fn group_thousands(n: u32) -> String {
 /// - `kuksa` or `kuksa:<url>` -- VSS signals from a Kuksa databroker
 ///   (`kuksa.rs`), `http://127.0.0.1:55555` unless named; pairs with the
 ///   `kuksasim` binary.
+/// - `obd:bt:<bdaddr>`, `obd:tcp:<host:port>` or `obd:serial:<path>` -- a
+///   real car through an ELM327-compatible OBD-II dongle (`obd.rs`).
 ///
 /// To add another (VSS / KUKSA, a replay file, ...), implement
 /// `TelemetrySource` (see `telemetry.rs`) and add an arm here. A fallible
@@ -124,6 +127,7 @@ fn select_source() -> Box<dyn TelemetrySource> {
         ("can", iface) => Box::new(CanSource::open(iface)),
         ("kuksa", "") => Box::new(KuksaSource::connect("http://127.0.0.1:55555")),
         ("kuksa", url) => Box::new(KuksaSource::connect(url)),
+        ("obd", link) => Box::new(ObdSource::connect(link)),
         _ => {
             eprintln!("agl-slint-cluster: unknown CLUSTER_SOURCE={var:?}, using the simulation");
             Box::new(SimSource::new())

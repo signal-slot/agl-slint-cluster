@@ -10,8 +10,9 @@ Description=Slint instrument cluster
 Environment=SLINT_BACKEND=linuxkms
 Environment=SLINT_FULLSCREEN=1
 # Signals come from the built-in simulation unless a source is named: a CAN
-# bus (CLUSTER_SOURCE=can:can0, see docs/can.md) or the Kuksa databroker
-# (CLUSTER_SOURCE=kuksa, see docs/kuksa.md).
+# bus (CLUSTER_SOURCE=can:can0, see docs/can.md), the Kuksa databroker
+# (CLUSTER_SOURCE=kuksa, see docs/kuksa.md) or an OBD-II dongle
+# (CLUSTER_SOURCE=obd:bt:<address>, see docs/obd.md).
 #Environment=CLUSTER_SOURCE=kuksa
 ExecStart=/usr/bin/agl-slint-cluster
 Restart=on-failure
