@@ -9,6 +9,9 @@ Description=Slint instrument cluster
 # unit just takes the display directly.
 Environment=SLINT_BACKEND=linuxkms
 Environment=SLINT_FULLSCREEN=1
+# Signals come from the built-in simulation unless a source is named; on a
+# vehicle bus set e.g. CLUSTER_SOURCE=can:can0 (see docs/can.md).
+#Environment=CLUSTER_SOURCE=can:can0
 ExecStart=/usr/bin/agl-slint-cluster
 Restart=on-failure
 RestartSec=2

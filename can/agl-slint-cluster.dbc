@@ -1,0 +1,93 @@
+VERSION "agl-slint-cluster 1"
+
+NS_ :
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	BA_DEF_SGTYPE_
+	BA_SGTYPE_
+	SIG_TYPE_REF_
+	VAL_TABLE_
+	SIG_GROUP_
+	SIG_VALTYPE_
+	SIGTYPE_VALTYPE_
+	BO_TX_BU_
+	BA_DEF_REL_
+	BA_REL_
+	BA_DEF_DEF_REL_
+	BU_SG_REL_
+	BU_BO_REL_
+	SG_MUL_VAL_
+
+BS_:
+
+BU_: VEHICLE CLUSTER
+
+
+BO_ 256 CLUSTER_MOTION: 8 VEHICLE
+ SG_ speed_kmh : 0|16@1+ (0.01,0) [0|655.35] "km/h" CLUSTER
+ SG_ power : 16|16@1- (0.001,0) [-1|1] "" CLUSTER
+ SG_ efficiency_percent : 32|8@1+ (1,0) [0|100] "%" CLUSTER
+ SG_ gear : 40|8@1+ (1,0) [0|255] "ASCII" CLUSTER
+ SG_ ready : 48|1@1+ (1,0) [0|1] "" CLUSTER
+
+BO_ 257 CLUSTER_ENERGY: 8 VEHICLE
+ SG_ battery_level : 0|8@1+ (1,0) [0|100] "%" CLUSTER
+ SG_ fuel_level : 8|8@1+ (1,0) [0|100] "%" CLUSTER
+ SG_ range_km : 16|16@1+ (1,0) [0|65535] "km" CLUSTER
+ SG_ avg_efficiency_kwh : 32|16@1+ (0.01,0) [0|655.35] "km/kWh" CLUSTER
+ SG_ outside_temp_c : 48|8@1- (1,0) [-128|127] "degC" CLUSTER
+
+BO_ 258 CLUSTER_TRIP: 8 VEHICLE
+ SG_ odo_km : 0|32@1+ (0.1,0) [0|429496729.5] "km" CLUSTER
+ SG_ trip_seconds : 32|32@1+ (1,0) [0|4294967295] "s" CLUSTER
+
+BO_ 259 CLUSTER_ADAS: 8 VEHICLE
+ SG_ cruise_speed_kmh : 0|8@1+ (1,0) [0|255] "km/h" CLUSTER
+ SG_ cruise : 8|8@1+ (1,0) [0|2] "" CLUSTER
+ SG_ lane : 16|8@1+ (1,0) [0|3] "" CLUSTER
+ SG_ lta_on : 24|1@1+ (1,0) [0|1] "" CLUSTER
+ SG_ lca_on : 25|1@1+ (1,0) [0|1] "" CLUSTER
+ SG_ turn_distance_km : 32|16@1+ (0.01,0) [0|655.35] "km" CLUSTER
+
+BO_ 260 CLUSTER_TELLTALES: 8 VEHICLE
+ SG_ turn_left : 0|1@1+ (1,0) [0|1] "" CLUSTER
+ SG_ turn_right : 1|1@1+ (1,0) [0|1] "" CLUSTER
+ SG_ headlights : 2|2@1+ (1,0) [0|2] "" CLUSTER
+ SG_ parking_brake : 4|1@1+ (1,0) [0|1] "" CLUSTER
+ SG_ seatbelt : 5|1@1+ (1,0) [0|1] "" CLUSTER
+ SG_ door_open : 6|1@1+ (1,0) [0|1] "" CLUSTER
+ SG_ engine : 8|8@1+ (1,0) [0|2] "" CLUSTER
+ SG_ oil : 16|8@1+ (1,0) [0|2] "" CLUSTER
+ SG_ battery_warn : 24|8@1+ (1,0) [0|2] "" CLUSTER
+ SG_ abs : 32|8@1+ (1,0) [0|2] "" CLUSTER
+
+BO_ 261 CLUSTER_STREET: 8 VEHICLE
+ SG_ chunk : 0|8@1+ (1,0) [0|3] "" CLUSTER
+ SG_ text : 8|56@1+ (1,0) [0|0] "UTF-8" CLUSTER
+
+
+
+CM_ BO_ 256 "Speed and drivetrain. The cluster keeps the last value of every field a frame carries, so a sender may emit any subset of these messages.";
+CM_ SG_ 256 power "Energy flow: -1 full regen / charge .. +1 full power. Drives the left dial.";
+CM_ SG_ 256 gear "ASCII letter: P R N D.";
+CM_ BO_ 261 "Next-turn street name, UTF-8, up to 28 bytes in 4 chunks of 7. Chunk 0 starts a new name; a name of 7 bytes or fewer needs one frame. Omit trailing bytes (DLC < 8) or pad with 0x00.";
+CM_ SG_ 261 text "Up to 7 bytes of text, first byte in the lowest address.";
+
+VAL_ 259 cruise 0 "off" 1 "set" 2 "active" ;
+VAL_ 259 lane 0 "off" 1 "tracking" 2 "warn" 3 "depart" ;
+VAL_ 260 headlights 0 "off" 1 "low" 2 "high" ;
+VAL_ 260 engine 0 "off" 1 "amber" 2 "red" ;
+VAL_ 260 oil 0 "off" 1 "amber" 2 "red" ;
+VAL_ 260 battery_warn 0 "off" 1 "amber" 2 "red" ;
+VAL_ 260 abs 0 "off" 1 "amber" 2 "red" ;

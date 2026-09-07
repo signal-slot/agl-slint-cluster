@@ -21,6 +21,12 @@ pub struct SimSource {
     odo_km: f32,
 }
 
+impl Default for SimSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SimSource {
     pub fn new() -> Self {
         Self {

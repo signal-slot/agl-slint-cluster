@@ -15,6 +15,9 @@ rust-version = "1.85"   # edition 2024
 # the feature flags below instead.
 slint = { version = "1.17.1", default-features = false, features = ["compat-1-2", "std"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+# Linux SocketCAN, for the `can` telemetry source. Every target here is Linux
+# (KMS/DRM on the board, a window on the workstation), so it is unconditional.
+socketcan = { version = "4.0", default-features = false }
 
 [build-dependencies]
 slint-build = "1.17.1"

@@ -4,10 +4,9 @@
 use std::error::Error;
 use std::time::Duration;
 
-mod sim;
-mod telemetry;
-
-use telemetry::{Beam, Cruise, Lane, Telemetry, TelemetrySource, Warn};
+use agl_slint_cluster::can::CanSource;
+use agl_slint_cluster::sim::SimSource;
+use agl_slint_cluster::telemetry::{Beam, Cruise, Lane, Telemetry, TelemetrySource, Warn};
 
 slint::include_modules!();
 
@@ -101,21 +100,27 @@ fn group_thousands(n: u32) -> String {
     out
 }
 
-/// Choose where the cluster's signals come from. Swap the simulation for real
-/// or emulated data here: implement `TelemetrySource` (see `telemetry.rs`) and
-/// return it. `CLUSTER_SOURCE` selects at runtime; it defaults to the built-in
-/// simulation, so an emulator can be wired in without touching the UI.
+/// Choose where the cluster's signals come from. `CLUSTER_SOURCE` selects at
+/// runtime and defaults to the built-in simulation:
+///
+/// - `sim` -- the built-in drive cycle (`sim.rs`).
+/// - `can` or `can:<iface>` -- frames from a SocketCAN interface (`can.rs`),
+///   `can0` unless named; `can:vcan0` pairs with the `cansim` binary.
+///
+/// To add another (VSS / KUKSA, a replay file, ...), implement
+/// `TelemetrySource` (see `telemetry.rs`) and add an arm here. A fallible
+/// source should surface its own error (or fall back) inside its constructor;
+/// `select_source` returns an infallible source.
 fn select_source() -> Box<dyn TelemetrySource> {
-    match std::env::var("CLUSTER_SOURCE").as_deref() {
-        Ok("sim") | Err(_) => Box::new(sim::SimSource::new()),
-        // Add real / emulated sources here, e.g.
-        //   Ok("can") => Box::new(can::CanSource::connect()),
-        //   Ok("replay") => Box::new(replay::ReplaySource::open(path)),
-        // A fallible source should surface its own error (or fall back) inside
-        // its constructor; `select_source` returns an infallible source.
-        Ok(other) => {
-            eprintln!("agl-slint-cluster: unknown CLUSTER_SOURCE={other:?}, using the simulation");
-            Box::new(sim::SimSource::new())
+    let var = std::env::var("CLUSTER_SOURCE").unwrap_or_default();
+    let (kind, arg) = var.split_once(':').unwrap_or((var.as_str(), ""));
+    match (kind, arg) {
+        ("sim", _) | ("", _) => Box::new(SimSource::new()),
+        ("can", "") => Box::new(CanSource::open("can0")),
+        ("can", iface) => Box::new(CanSource::open(iface)),
+        _ => {
+            eprintln!("agl-slint-cluster: unknown CLUSTER_SOURCE={var:?}, using the simulation");
+            Box::new(SimSource::new())
         }
     }
 }

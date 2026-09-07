@@ -16,6 +16,7 @@ target keeps its own thin application layer:
 
 ```
 ui/          shared, language-agnostic UI (.slint + assets) -- the design lives here
+can/         the CAN frame layout as a DBC, shared by every target (see docs/can.md)
 rust/        Linux / AGL application (this is what builds today)
 zephyr/      C++ on Zephyr RTOS            (planned)
 baremetal/   no_std Rust on an MCU, e.g. Pico 2 / RP2350 (planned)
@@ -92,6 +93,21 @@ repository is the application source only.
 > On AGL, the seamless boot-splash handover (rendering on a lease from
 > `drm-lease-manager` instead of taking DRM master) is added when packaging the
 > image. It is a deployment concern and deliberately kept out of the app.
+
+### From a CAN bus
+
+Set `CLUSTER_SOURCE=can` (or `can:<iface>`) and the cluster reads its signals
+from a SocketCAN interface instead of the built-in simulation. The frame layout
+is small and documented in [`docs/can.md`](docs/can.md), with a DBC in `can/`
+for tools like cantools or SavvyCAN. To play with it without hardware, put the
+simulation on a virtual bus:
+
+```sh
+sudo ip link add dev vcan0 type vcan && sudo ip link set up vcan0
+CLUSTER_SOURCE=can:vcan0 cargo run &     # in rust/
+cargo run --bin cansim                   # sends the drive cycle on vcan0
+cansend vcan0 104#15                     # ..and poke at it: indicator, low beam, parking brake
+```
 
 ### Deployment
 
