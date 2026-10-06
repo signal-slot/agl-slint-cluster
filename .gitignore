@@ -6,3 +6,7 @@ target/
 # Editor / OS
 .DS_Store
 *.swp
+
+# Cargo.lock: this is an app/demo -- build against the latest in-range
+# versions each time; no lock churn to maintain. (Distros pin on their side.)
+Cargo.lock

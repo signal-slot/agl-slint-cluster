@@ -18,10 +18,14 @@ slint::include_modules!();
 #[cfg(any(
     all(feature = "desktop", feature = "device"),
     all(feature = "desktop", feature = "qt"),
+    all(feature = "desktop", feature = "device-gles"),
     all(feature = "device", feature = "qt"),
+    all(feature = "device", feature = "device-gles"),
+    all(feature = "qt", feature = "device-gles"),
 ))]
 compile_error!(
-    "enable only one of the `desktop`, `device`, or `qt` features (use --no-default-features)"
+    "enable only one of the `desktop`, `device`, `qt`, or `device-gles` features \
+     (use --no-default-features)"
 );
 
 /// Push one telemetry frame into the UI. This is the ONLY place that turns

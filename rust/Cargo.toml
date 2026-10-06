@@ -47,6 +47,14 @@ device = ["slint/backend-linuxkms", "slint/renderer-skia"]
 # Headless verification on a workstation: the Qt backend, e.g. served over VNC
 # with a VNC QPA platform. Build with `--no-default-features --features qt`.
 qt = ["slint/backend-qt"]
+# A board with no compositor, GPU rendering through the board's OpenGL ES driver
+# (e.g. Mesa v3d on a Raspberry Pi 4): KMS/DRM with the FemtoVG renderer. In
+# Slint 1.18 `backend-linuxkms-noseat` means "no libseat": Slint uses libinput
+# directly, so the app needs `/dev/input` access (root, or the `input` group)
+# on a free VT. Build with `--no-default-features --features device-gles`.
+# Proven on a Raspberry Pi 4 (Debian 13, Mesa v3d): see the YakoGL repository's
+# `website/measurements/linuxkms-run-2026-10-06.md`.
+device-gles = ["slint/backend-linuxkms-noseat", "slint/renderer-femtovg"]
 
 [profile.release]
 codegen-units = 1
