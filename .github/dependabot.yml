@@ -1,0 +1,15 @@
+version: 2
+updates:
+  # Keeps rust/Cargo.lock current: one weekly PR, checked by CI before merge.
+  - package-ecosystem: cargo
+    directory: /rust
+    versioning-strategy: lockfile-only
+    schedule:
+      interval: weekly
+    groups:
+      cargo:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

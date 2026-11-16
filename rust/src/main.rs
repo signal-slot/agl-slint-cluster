@@ -98,7 +98,7 @@ fn group_thousands(n: u32) -> String {
     let s = n.to_string();
     let mut out = String::new();
     for (i, c) in s.chars().enumerate() {
-        if i > 0 && (s.len() - i) % 3 == 0 {
+        if i > 0 && (s.len() - i).is_multiple_of(3) {
             out.push(',');
         }
         out.push(c);
@@ -155,7 +155,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     timer.start(slint::TimerMode::Repeated, period, move || {
         let Some(ui) = weak.upgrade() else { return };
         let frame = source.poll(dt);
-        let blink = (ticks / 8) % 2 == 0;
+        let blink = (ticks / 8).is_multiple_of(2);
         apply(&ui, &frame, blink);
         ticks += 1;
     });

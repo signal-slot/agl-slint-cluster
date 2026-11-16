@@ -7,7 +7,7 @@ license = "MIT"
 repository = "https://github.com/signal-slot/agl-slint-cluster"
 authors = ["Tasuku Suzuki <tasuku.suzuki@signal-slot.co.jp>"]
 readme = "README.md"
-rust-version = "1.85"   # edition 2024
+rust-version = "1.95"   # slint 1.19
 
 [dependencies]
 # default-features = false drops the winit backend, which would otherwise be

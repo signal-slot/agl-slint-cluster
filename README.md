@@ -90,6 +90,8 @@ The `device` feature uses the linuxkms backend with the Skia renderer, taking
 the display directly (DRM master). Cross-compilation and image integration are
 done with Yocto/OpenEmbedded (a `meta-` layer with a BitBake recipe); this
 repository is the application source only.
+`rust/Cargo.lock` pins the crate versions that CI builds and tests.
+A recipe generates its crate list from it with `bitbake -c update_crates`.
 
 > On AGL, the seamless boot-splash handover (rendering on a lease from
 > `drm-lease-manager` instead of taking DRM master) is added when packaging the
